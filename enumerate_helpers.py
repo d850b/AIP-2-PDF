@@ -1,7 +1,8 @@
 """ some (possibly stupid) helpers """
 import os
-import requests
 from bs4 import BeautifulSoup, Tag
+import io
+import PIL.Image
 
 
 def check_for_refresh_redirect(soup: BeautifulSoup):
@@ -68,3 +69,10 @@ def files_with_extension(path : str, extension: str):
                 entry_parts = os.path.splitext(entry.path)
                 if entry_parts[1] and entry_parts[1].upper() == extension:
                     yield entry
+
+
+def convert_to_jpeg_inline(bts : bytes) -> bytes:
+    im = PIL.Image.open( io.BytesIO(bts))
+    output = io.BytesIO()
+    im.save(output, format="JPEG", quality = 95, dpi = (1200,1200))
+    return output.getvalue()

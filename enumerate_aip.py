@@ -3,11 +3,13 @@ from bs4 import BeautifulSoup, Tag
 import urllib.parse
 import os 
 import base64
+import pyx
 
-from enumerate_helpers import check_for_refresh_redirect, sanitize_for_path
+
+from enumerate_helpers import check_for_refresh_redirect, sanitize_for_path, convert_to_jpeg_inline, files_with_extension, iterable_to_pairs
 
 
-def get_soup_resolve_redirects(url : str):
+def get_soup_resolve_redirects(url : str) :
     """ get BeautifulSoup object from url. Resolve redirects before return.
     returns (url, soup), i.e the final url along with the soup. 
     (well, this is not completely true, it does so for the kind of redirects used in the AIP.
@@ -43,7 +45,7 @@ def get_decode_aip_document_items(tag : Tag):
         document_name = document_name_tag.text
         yield (document_name, document_rel_url)
 
-def get_bytes_from_aip_img(tag : Tag):
+def get_bytes_from_aip_img(tag : Tag) -> bytes :
     """ get a bytes object from an aip image. (inline, base64 encoded png)"""
     if tag.name != "img" : raise Exception("expected <img>")
     src = tag['src']
@@ -54,6 +56,49 @@ def get_bytes_from_aip_img(tag : Tag):
     if scrparts2[0] != 'base64':
         raise Exception(f"unexpected src coding")
     return base64.b64decode(scrparts2[1])
+
+def assemble_aip_images_to_pdf(image_folder : str):
+    """ collect jpg images in image_folder to pdf. 
+     Place 2 images per page side by side, page in landscape.
+     If there is a single last image, put it full size in portrait on
+     the last page
+     Approach carts come first, than the text pages. 
+     For the usual 3 piece AIP-VFR entry (2 app, 1 text), this results
+     in a nicely foldable approach chart, especially if printed 2 sided. 
+     For larger airports, the pdf is likely crap. For now, you have to 
+     assemble the jpgs manually than.
+    """
+    pages = []
+
+    img_files = list(files_with_extension(image_folder, '.jpg'))
+    # order files so that the carts come first.
+    reordered = [f for f in img_files if f.name.startswith('ED')]
+    reordered += [f for f in img_files if f.name.startswith('AD 2')]
+
+    for jpg_file_entries_pair in iterable_to_pairs( reordered ):
+        twopage = len(jpg_file_entries_pair) > 1
+        horz_offs = 0.2 if twopage else 0.0
+        canvas = pyx.canvas.canvas()
+        # add first image. 
+        bitmap_image = pyx.bitmap.jpegimage(jpg_file_entries_pair[0].path)
+        bitmap = pyx.bitmap.bitmap(0, 1, bitmap_image, height= 1.0, compressmode = None)
+        canvas.insert(bitmap )
+        if twopage :
+            # add 2nd bitmap, left of the middle. 
+            bitmap_image = pyx.bitmap.jpegimage(jpg_file_entries_pair[1].path)
+            bitmap = pyx.bitmap.bitmap(0.5 + horz_offs, 1, bitmap_image, height= 1.0, compressmode = None)
+            canvas.insert(bitmap )
+        if twopage:
+            # add canvas with 2 images in landscape direction
+            page = pyx.document.page(canvas, paperformat=pyx.document.paperformat.A4, rotated = 1, fittosize=1, margin = 0)
+        else:
+            # add canvas with single image in 'portrait' direction.
+            page = pyx.document.page(canvas, paperformat=pyx.document.paperformat.A4, rotated = 0, fittosize=1, margin = 0)
+        pages.append(page)
+    document = pyx.document.document(pages=pages)
+    document.writePDFfile(os.path.join(image_folder, os.path.split(image_folder)[1] + ".pdf"))
+
+
 
 indent_count = 0
 
@@ -73,24 +118,24 @@ def recurse_aip(url : str, target_folder: str):
             try:
                 response = requests.get(abs_url, allow_redirects=True)
 
-                # FIRST save the complete html document into target folder.
-                file_name = os.path.join( target_folder, sanitize_for_path(document_name))
-                with open(file_name  + ".html", "w") as f:
-                    f.write(response.text)
-
-                # SECOND: extract the png image into the target folder.
+                # extract the image into the target folder, converted to jpeg.
                 # it is in an <img> tag, base64 encoded. 
                 document_soup = BeautifulSoup(response.text, 'html.parser')
                 img_tag = document_soup.find('img', class_ = 'pageImage', id = 'imgAIP')
                 if img_tag :
-                    img_bytes = get_bytes_from_aip_img(img_tag)
-                    with open(file_name  + ".PNG", "bw") as f:
-                        f.write(img_bytes)
+                    png_bytes = get_bytes_from_aip_img(img_tag)
+                    # convert to jpg, as pyx library can only handle jpg.
+                    jpg_bytes = convert_to_jpeg_inline(png_bytes)
+                    file_name = os.path.join( target_folder, sanitize_for_path(document_name) + ".jpg")
+                    with open(file_name, "bw") as f:
+                        f.write(jpg_bytes)
                 else:
                     raise Exception(f"img tag not found")
             except BaseException as be : 
                 be.add_note(f"when reading document data from {abs_url}")
                 raise be
+        # build pdf from image files in folder.
+        assemble_aip_images_to_pdf(target_folder)
 
         # are there any folders in the current folder? -> recurse.
         folders = get_decode_aip_folder_items(soup)
