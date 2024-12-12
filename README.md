@@ -37,10 +37,10 @@ For most small airports, this is usable as a neatly foldable A5 approach chart.
 For some (ifr and e.g. EDHE) it will currently be crap.  
 
 
-The website uses the concept or "permalinks", i.e. non links which do 
+The AIP website uses the concept or "permalinks", i.e. known links which do 
 not change between AIP cycles. These links are addressing small "stub" 
 pages which redirect into the "real" tree (with monthly changing adresses.)
 The redirect mechanism might be a bit unusual, it is handled be a "reload" instruction. 
 
-This redirect is recognized and handled by the program, too, so you can use
+This redirect is recognized and handled by the program too, so you can use
 any permalink as entry point for the scan.
