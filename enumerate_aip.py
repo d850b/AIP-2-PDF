@@ -71,9 +71,17 @@ def assemble_aip_images_to_pdf(image_folder : str):
     pages = []
 
     img_files = list(files_with_extension(image_folder, '.jpg'))
-    # order files so that the carts come first.
-    reordered = [f for f in img_files if f.name.startswith('ED')]
-    reordered += [f for f in img_files if f.name.startswith('AD 2')]
+    if len(img_files) == 0:
+        # no pdf for empty (e.g. intermediate) folders
+        return
+
+    def DirEntryName(entry):
+        return entry.name
+
+    # order files so that the carts come first.(its either ED or ET, normally... )
+    reordered = sorted( [f for f in img_files if f.name.startswith('ED')], key=DirEntryName )
+    reordered += sorted( [f for f in img_files if f.name.startswith('ET')], key=DirEntryName )
+    reordered += sorted( [f for f in img_files if f.name.startswith('AD 2')], key=DirEntryName)
 
     for jpg_file_entries_pair in iterable_to_pairs( reordered ):
         twopage = len(jpg_file_entries_pair) > 1
@@ -155,6 +163,7 @@ if __name__ == '__main__':
     #aip_root = 'https://aip.dfs.de/BasicVFR/pages/C00001.html'
 
     # use another entry point for testing: 
-    aip_root = 'https://aip.dfs.de/BasicVFR/pages/C00064.html'
+    #aip_root = 'https://aip.dfs.de/BasicVFR/pages/C00064.html'
+    aip_root ='https://aip.dfs.de/BasicVFR/pages/C0005E.html'
 
     recurse_aip(aip_root, "./downloads/aip_1")
