@@ -1,0 +1,45 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'aip2pdf'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=aip2pdf",
+                    "--package=aip2pdf"
+                ],
+                "filter": {
+                    "name": "aip2pdf",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'aip2pdf'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=aip2pdf",
+                    "--package=aip2pdf"
+                ],
+                "filter": {
+                    "name": "aip2pdf",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

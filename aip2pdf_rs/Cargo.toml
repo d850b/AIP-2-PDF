@@ -4,3 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+tokio = { version = "1", features = ["full"] }
+reqwest = "0.12.9"
+scraper = "0.22.0"
+
+# url is re-exported by reqwest. Otherwise we would
+# use this:
+#url = "2.5.4"
