@@ -7,8 +7,8 @@ use helpers::{Aip2PdfError, ErrorType};
 use tokio::select;
 
 
-//const aip_root : &str = "https://aip.dfs.de/BasicVFR/pages/C00001.html";
-const AIP_ROOT : &str = "https://aip.dfs.de/BasicVFR/pages/C0005E.html";
+const AIP_ROOT : &str = "https://aip.dfs.de/BasicVFR/pages/C00001.html";
+//const AIP_ROOT : &str = "https://aip.dfs.de/BasicVFR/pages/C0005E.html";
 
 
 async fn get_document_resolve_redirects(url: reqwest::Url) -> Result<(reqwest::Url, Html), ErrorType>{
@@ -40,7 +40,7 @@ fn check_for_refresh_redirects(document : & Html) -> Result<Option<(i32, &str)>,
     let select_meta_refresh = Selector::parse(r#"meta[http-equiv="refresh"]"#)?;
 
     if let Some(element) = document.select(&select_meta_refresh).next() {
-        println!("{:?}", element);
+        //println!("{:?}", element);
         if let Some(content) = element.value().attr("content"){
             let split1 : Vec<&str> = content.split(";").collect();
             if split1.len() == 2 {
@@ -62,17 +62,6 @@ fn check_for_refresh_redirects(document : & Html) -> Result<Option<(i32, &str)>,
         Ok(None)
     }
 }
-
-// The original pyhton function:
-//
-// def get_decode_aip_folder_items(tag : Tag):
-//     items = tag.find_all("li", class_ = "folder-item")
-//     for item in items:
-//         folder_link_tag = item.find("a", class_ = "folder-link")
-//         folder_rel_url = folder_link_tag.attrs.get("href")
-//         folder_name_tag = item.find("span", class_= "folder-name", lang = "en")
-//         folder_name = folder_name_tag.text
-//         yield (folder_name, folder_rel_url)
 
 
 fn get_decode_aip_folder_items__test_selection<'a, S : Selectable<'a>>(selectable : S) -> Result<(), ErrorType>{
@@ -126,6 +115,75 @@ fn get_decode_aip_folder_items<'a, S : Selectable<'a> + 'a>(selectable : S, sele
     Ok( it2)
 }
 
+fn get_decode_aip_document_items<'a, S : Selectable<'a> + 'a>(selectable : S, selectors : &'a AllSelectors) -> Result< impl Iterator<Item = (String, String)> + 'a, ErrorType>{
+    let it = selectable.select(&selectors.select_document_item);
+    let it2 = it.map(|document_item_element| {
+        let mut href_str = String::new();
+        let mut name_str = String::new();
+        if let Some(document_link_element) = document_item_element.select(&selectors.select_document_link).next(){
+            if let Some(href) = document_link_element.value().attr("href"){
+                href_str = href.into();
+            }
+            if let Some(folder_name_element) = document_link_element.select(&selectors.select_document_name).next(){
+                if let Some(folder_name)  =  folder_name_element.text().next(){
+                    name_str = folder_name.into();
+                }
+            }
+        }
+        (href_str, name_str)
+    });
+    Ok( it2)
+}
+
+async fn recurse_aip(selectors: &AllSelectors, url : Url, target_folder : &str, recurse_level : i32) -> Result<(), ErrorType> {
+
+    let (final_url, document) = get_document_resolve_redirects( url ).await?;
+
+    for (href, name) in get_decode_aip_document_items(&document, &selectors)?{
+        let spacer = " ".repeat(recurse_level as usize);
+        println!("D{}{}", spacer, name);
+
+    }
+
+    for (href, name)  in get_decode_aip_folder_items(&document, &selectors)? {
+        let recurse_url = final_url.join(&href)?;
+        let spacer = " ".repeat(recurse_level as usize);
+        //println!("{}{:?} {:?}, {:?}", spacer, href, name, recurse_url);
+        println!("F{}{}", spacer, name);
+        // some magic to allow to recurse async... 
+        Box::pin(recurse_aip(selectors, recurse_url, target_folder, recurse_level + 1)).await?;
+        //recurse_aip(selectors, recurse_url, target_folder, recurse_level + 1).await?;
+    }
+
+    Ok(())
+}
+
+
+
+#[tokio::main]
+async fn main() -> Result<(), ErrorType> {
+    // initialize selectors
+    let selectors = AllSelectors::new()?;
+
+    //let (_url, document) = get_document_resolve_redirects ( Url::parse(AIP_ROOT)?).await?;
+
+
+    //println!("{}", document.html());
+    //get_decode_aip_folder_items__test_selection( &document)?;
+
+    // for x  in get_decode_aip_folder_items__test_iterator(&document, &selectors)? {
+    //     println!("{:?}", x)
+    // }
+
+    // for x  in get_decode_aip_folder_items(&document, &selectors)? {
+    //     println!("{:?}", x)
+    // }
+
+    recurse_aip(&selectors, Url::parse(AIP_ROOT)?, "", 0).await?;
+
+    Ok(())
+}
+
 
 
 
@@ -137,6 +195,10 @@ struct AllSelectors{
     pub select_folder_item : Selector,
     pub select_folder_link  : Selector,
     pub select_folder_name  : Selector,
+
+    pub select_document_item : Selector,
+    pub select_document_link : Selector,
+    pub select_document_name : Selector,
 }
 
 impl AllSelectors {
@@ -144,31 +206,13 @@ impl AllSelectors {
         Ok(
             Self { 
                 select_folder_item : Selector::parse(r#"li[class="folder-item"]"#)?,
-                select_folder_link :Selector::parse(r#"a[class="folder-link"]"#)?, 
-                select_folder_name : Selector::parse(r#"span[class="folder-name"][lang="en"]"#)?
+                select_folder_link : Selector::parse(r#"a[class="folder-link"]"#)?, 
+                select_folder_name : Selector::parse(r#"span[class="folder-name"][lang="en"]"#)?,
+
+                select_document_item : Selector::parse(r#"li[class="document-item"]"#)?,
+                select_document_link : Selector::parse(r#"a[class="document-link"]"#)?,
+                select_document_name : Selector::parse(r#"span[class="document-name"][lang="en"]"#)?
             }
         )
     }
 }
-
-#[tokio::main]
-async fn main() -> Result<(), ErrorType> {
-
-    let (_url, document) = get_document_resolve_redirects ( Url::parse(AIP_ROOT)?).await?;
-
-    let selectors = AllSelectors::new()?;
-
-    //println!("{}", document.html());
-    //get_decode_aip_folder_items__test_selection( &document)?;
-
-    // for x  in get_decode_aip_folder_items__test_iterator(&document, &selectors)? {
-    //     println!("{:?}", x)
-    // }
-
-    for x  in get_decode_aip_folder_items(&document, &selectors)? {
-        println!("{:?}", x)
-    }
-
-    Ok(())
-}
-
