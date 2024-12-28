@@ -32,14 +32,12 @@ impl std::fmt::Display for Aip2PdfError{
 impl std::error::Error for Aip2PdfError {    
 }
 
-// impl From<Aip2PdfError> for Box< std::error::Error>{
-//     fn from(error : Aip2PdfError) -> Self {
-//         Box::new(error)
-//     }
-// }
 
-// impl Into<Box<dyn std::error::Error>> for Aip2PdfError {
-//     fn into(self) -> Box<dyn std::error::Error> {
-//         Box::new( self)
-//     }
-// }
+// def sanitize_for_path(s: str):
+//     """ make str useable as directore/file name.
+//       a little radical, but better save than sorry.. """
+//     return "".join((x if x.isalnum() or x == ' ' else '_' for x in s))
+
+pub fn sanitize_for_path(s : & str) -> String {
+    s.chars().map(|c| if c.is_alphanumeric() | (c == ' ') {c} else {'_'} ).collect()
+}
