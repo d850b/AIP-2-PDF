@@ -3,12 +3,15 @@ use reqwest::{Client, Url};
 use scraper::{selectable::Selectable, Html, Selector, ElementRef};
 
 mod helpers;
-use helpers::{Aip2PdfError, ErrorType};
+use helpers::{sanitize_for_path, Aip2PdfError, ErrorType};
 use tokio::select;
 
 
-const AIP_ROOT : &str = "https://aip.dfs.de/BasicVFR/pages/C00001.html";
-//const AIP_ROOT : &str = "https://aip.dfs.de/BasicVFR/pages/C0005E.html";
+// This is the total AIP VFR
+//const AIP_ROOT : &str = "https://aip.dfs.de/BasicVFR/pages/C00001.html";
+
+// this is the AIP/AD/I-J page
+const AIP_ROOT : &str = "https://aip.dfs.de/BasicVFR/pages/C0005E.html"; 
 
 
 async fn get_document_resolve_redirects(url: reqwest::Url) -> Result<(reqwest::Url, Html), ErrorType>{
@@ -64,35 +67,6 @@ fn check_for_refresh_redirects(document : & Html) -> Result<Option<(i32, &str)>,
 }
 
 
-fn get_decode_aip_folder_items__test_selection<'a, S : Selectable<'a>>(selectable : S) -> Result<(), ErrorType>{
-    // Hm. Generating the selectors anew for every call looks like overhead, right?
-    let select_folder_item = Selector::parse(r#"li[class="folder-item"]"#)?;
-    let select_folder_link = Selector::parse(r#"a[class="folder-link"]"#)?;
-    let select_folder_name = Selector::parse(r#"span[class="folder-name"][lang="en"]"#)?;
-    for folder_item_element in selectable.select(&select_folder_item){
-        //println!("{:?}", folder_item_element.html());
-        if let Some(folder_link_element) = folder_item_element.select(&select_folder_link).next(){
-            //println!("{:?}", folder_link_element.html());
-            if let Some(href) = folder_link_element.value().attr("href"){
-                println!("href = {}", href);
-            }
-            if let Some(folder_name_element) = folder_link_element.select(&select_folder_name).next(){
-                if let Some(folder_name)  =  folder_name_element.text().map(|n| n).next(){
-                    println!("name = {}", folder_name)
-                }
-            }
-        }
-    }
-    Ok(())
-}
-
-/// how the heck do i learn where to place all those lifetime parameters... 
-fn get_decode_aip_folder_items__test_iterator<'a, S : Selectable<'a> + 'a>(selectable : S, selectors : &'a AllSelectors) -> Result< Box<dyn Iterator<Item = ElementRef<'a>> + 'a>, ErrorType>{
-    let it = selectable.select(&selectors.select_folder_item);
-
-    Ok( Box::new(it))
-
-}
 
 /// how the heck do i learn where to place all those lifetime parameters... 
 fn get_decode_aip_folder_items<'a, S : Selectable<'a> + 'a>(selectable : S, selectors : &'a AllSelectors) -> Result< impl Iterator<Item = (String, String)> + 'a, ErrorType>{
@@ -164,20 +138,6 @@ async fn recurse_aip(selectors: &AllSelectors, url : Url, target_folder : &str, 
 async fn main() -> Result<(), ErrorType> {
     // initialize selectors
     let selectors = AllSelectors::new()?;
-
-    //let (_url, document) = get_document_resolve_redirects ( Url::parse(AIP_ROOT)?).await?;
-
-
-    //println!("{}", document.html());
-    //get_decode_aip_folder_items__test_selection( &document)?;
-
-    // for x  in get_decode_aip_folder_items__test_iterator(&document, &selectors)? {
-    //     println!("{:?}", x)
-    // }
-
-    // for x  in get_decode_aip_folder_items(&document, &selectors)? {
-    //     println!("{:?}", x)
-    // }
 
     recurse_aip(&selectors, Url::parse(AIP_ROOT)?, "", 0).await?;
 
