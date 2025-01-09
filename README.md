@@ -5,7 +5,7 @@ This repository contains 2 programs which shall do the same thing.
 - One written in Python
 - On written in Rust.
 
-The Python version is developed to a useful state, described below.
+The Python version is developed to a partially useful state, described below.
 
 The Rust version is an "exercise" for me. I wantedn to explore how achieve the same functionality in Rust. It is not yet finished, but i am convinced that it can be done in a very similar way. 
 
@@ -26,6 +26,16 @@ For IFR airports and perhaps some VFR fields the pdf is currently
 unusable. (Working on it...) In this case you can still create your own documents from 
 the downloaded images using LibreOffice, OpenOffice, MS-Word or whatever 
 program works for you.
+
+### Problems:
+It is only useful for iterating over a subsection of the AD part. It is not
+yet possible to fetch all charts of the AD part without fetching lots of unneccessary
+pages. 
+
+When doing too many fetches from one IP address, the AIP website will block that address. I am not sure
+whether the limit allows to fetch all charts, so a selection mechanism should be esablished... 
+
+Perhaps the blockade can be avoided by throttling the fetches.  
 
 ## how it works:
 
