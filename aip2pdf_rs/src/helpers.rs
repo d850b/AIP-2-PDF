@@ -39,5 +39,5 @@ impl std::error::Error for Aip2PdfError {
 //     return "".join((x if x.isalnum() or x == ' ' else '_' for x in s))
 
 pub fn sanitize_for_path(s : & str) -> String {
-    s.chars().map(|c| if c.is_alphanumeric() | (c == ' ') {c} else {'_'} ).collect()
+    s.chars().map(|c| if c.is_alphanumeric() & (c != ' ') {c} else {'_'} ).collect()
 }

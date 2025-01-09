@@ -1,4 +1,6 @@
 
+use std::{fs, io::Write};
+
 use reqwest::{Client, Url};
 use scraper::{selectable::Selectable, Html, Selector, ElementRef};
 
@@ -67,8 +69,8 @@ fn check_for_refresh_redirects(document : & Html) -> Result<Option<(i32, &str)>,
 }
 
 
-
-/// how the heck do i learn where to place all those lifetime parameters... 
+/// create Iterator which returns information of all "folder" items found in Selectable (e.g. Html)
+/// (how the heck do i learn where to place all those lifetime parameters... )
 fn get_decode_aip_folder_items<'a, S : Selectable<'a> + 'a>(selectable : S, selectors : &'a AllSelectors) -> Result< impl Iterator<Item = (String, String)> + 'a, ErrorType>{
     let it = selectable.select(&selectors.select_folder_item);
     let it2 = it.map(|folder_item_element| {
@@ -89,6 +91,7 @@ fn get_decode_aip_folder_items<'a, S : Selectable<'a> + 'a>(selectable : S, sele
     Ok( it2)
 }
 
+/// create Iterator which returns information of all "document" items found in Selectable (e.g. Html)
 fn get_decode_aip_document_items<'a, S : Selectable<'a> + 'a>(selectable : S, selectors : &'a AllSelectors) -> Result< impl Iterator<Item = (String, String)> + 'a, ErrorType>{
     let it = selectable.select(&selectors.select_document_item);
     let it2 = it.map(|document_item_element| {
@@ -109,24 +112,38 @@ fn get_decode_aip_document_items<'a, S : Selectable<'a> + 'a>(selectable : S, se
     Ok( it2)
 }
 
-async fn recurse_aip(selectors: &AllSelectors, url : Url, target_folder : &str, recurse_level : i32) -> Result<(), ErrorType> {
+/// download an AIP document from url into path, using supplied document_name to create file name(s).
+async fn download_aip_document(url: Url, target_folder : &std::path::Path, document_name : &str) -> Result<(), ErrorType>{
+    let (_, real_document) = get_document_resolve_redirects(url).await?;
+    std::fs::create_dir_all(target_folder)?;
+
+    let file_path = target_folder.join(document_name.to_owned() + ".html");
+
+    let mut f = fs::File::create(file_path)?;
+    f.write(real_document.html().as_bytes())?;
+
+    Ok(())
+}
+
+async fn recurse_aip(selectors: &AllSelectors, url : Url, target_folder : &std::path::Path, recurse_level : i32) -> Result<(), ErrorType> {
 
     let (final_url, document) = get_document_resolve_redirects( url ).await?;
 
-    for (href, name) in get_decode_aip_document_items(&document, &selectors)?{
-        let spacer = " ".repeat(recurse_level as usize);
-        println!("D{}{}", spacer, name);
+    let spacer = " ".repeat(recurse_level as usize);
 
+    for (document_rel_url, document_name) in get_decode_aip_document_items(&document, &selectors)?{
+        let document_abs_url = final_url.join(&document_rel_url)?;
+        println!("<DOC>{}{}", spacer, document_name);
+        download_aip_document(document_abs_url, target_folder, &sanitize_for_path(&document_name)).await?;
     }
 
-    for (href, name)  in get_decode_aip_folder_items(&document, &selectors)? {
-        let recurse_url = final_url.join(&href)?;
-        let spacer = " ".repeat(recurse_level as usize);
+    for (folder_rel_url, folder_name)  in get_decode_aip_folder_items(&document, &selectors)? {
+        let folder_abs_url = final_url.join(&folder_rel_url)?;
+        let folder_path = target_folder.join(sanitize_for_path(&folder_name));
         //println!("{}{:?} {:?}, {:?}", spacer, href, name, recurse_url);
-        println!("F{}{}", spacer, name);
+        println!("<FLD>{}{}", spacer, folder_name);
         // some magic to allow to recurse async... 
-        Box::pin(recurse_aip(selectors, recurse_url, target_folder, recurse_level + 1)).await?;
-        //recurse_aip(selectors, recurse_url, target_folder, recurse_level + 1).await?;
+        Box::pin(recurse_aip(selectors, folder_abs_url, &folder_path, recurse_level + 1)).await?;
     }
 
     Ok(())
@@ -139,7 +156,7 @@ async fn main() -> Result<(), ErrorType> {
     // initialize selectors
     let selectors = AllSelectors::new()?;
 
-    recurse_aip(&selectors, Url::parse(AIP_ROOT)?, "", 0).await?;
+    recurse_aip(&selectors, Url::parse(AIP_ROOT)?, std::path::Path::new("./downloads/aip_1"), 0).await?;
 
     Ok(())
 }
