@@ -1,3 +1,18 @@
+# Content
+
+This repository contains 2 programs which shall do the same thing. 
+
+- One written in Python
+- On written in Rust.
+
+The Python version is developed to a useful state, described below.
+
+The Rust version is an "exercise" for me. I wantedn to explore how achieve the same functionality in Rust. It is not yet finished, but i am convinced that it can be done in a very similar way. 
+
+Current resume: 
+- Rust is a little more difficult as a language (at least for me and currently). 
+- The ecosystem is comparable to Python in many respects. 
+
 # AIP downloader
 
 Program to extract approach charts into pdf documents from the German 
