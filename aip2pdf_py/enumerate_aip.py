@@ -9,13 +9,16 @@ import pyx
 from enumerate_helpers import check_for_refresh_redirect, sanitize_for_path, convert_to_jpeg_inline, files_with_extension, iterable_to_pairs
 
 
+# fake user agent, with the original user agent header of python requests the dfs won't answer! They think they are clever or what???
+user_agent_header = {"User-Agent" : "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0"}
+
 def get_soup_resolve_redirects(url : str) :
     """ get BeautifulSoup object from url. Resolve redirects before return.
     returns (url, soup), i.e the final url along with the soup. 
     (well, this is not completely true, it does so for the kind of redirects used in the AIP.
     Must be enhanced when needed.)
     """
-    response = requests.get(url, allow_redirects=True)
+    response = requests.get(url, allow_redirects=False, headers=user_agent_header)
     while True:
         soup = BeautifulSoup(response.text, 'html.parser')
         refresh = check_for_refresh_redirect(soup)
@@ -23,7 +26,7 @@ def get_soup_resolve_redirects(url : str) :
             absrefresh = urllib.parse.urljoin(aip_root, refresh[1])
             print(f"redirected from {url} to {absrefresh}")
             url = absrefresh
-            response = requests.get(absrefresh, allow_redirects=True)
+            response = requests.get(absrefresh, allow_redirects=True, headers=user_agent_header)
         else:
             return url, soup
           
@@ -124,7 +127,7 @@ def recurse_aip(url : str, target_folder: str):
             print(f"{' ' * indent_count}<DOC>{document_name}")
             abs_url = urllib.parse.urljoin(url, document_rel_url)
             try:
-                response = requests.get(abs_url, allow_redirects=True)
+                response = requests.get(abs_url, allow_redirects=True, headers=user_agent_header)
 
                 # extract the image into the target folder, converted to jpeg.
                 # it is in an <img> tag, base64 encoded. 
