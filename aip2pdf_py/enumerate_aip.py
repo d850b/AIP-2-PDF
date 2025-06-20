@@ -8,6 +8,7 @@ import pyx
 
 from enumerate_helpers import check_for_refresh_redirect, sanitize_for_path, convert_to_jpeg_inline, files_with_extension, iterable_to_pairs
 
+indent_count = 0
 
 # fake user agent, with the original user agent header of python requests the dfs won't answer! They think they are clever or what???
 user_agent_header = {"User-Agent" : "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0"}
@@ -110,8 +111,30 @@ def assemble_aip_images_to_pdf(image_folder : str):
     document.writePDFfile(os.path.join(image_folder, os.path.split(image_folder)[1] + ".pdf"))
 
 
+def download_document_item(url, target_folder, document_name, document_rel_url):
+    print(f"{' ' * indent_count}<DOC>{document_name}")
+    abs_url = urllib.parse.urljoin(url, document_rel_url)
+    try:
+        response = requests.get(abs_url, allow_redirects=True, headers=user_agent_header)
 
-indent_count = 0
+                # extract the image into the target folder, converted to jpeg.
+                # it is in an <img> tag, base64 encoded. 
+        document_soup = BeautifulSoup(response.text, 'html.parser')
+        img_tag = document_soup.find('img', class_ = 'pageImage', id = 'imgAIP')
+        if img_tag :
+            png_bytes = get_bytes_from_aip_img(img_tag)
+                    # convert to jpg, as pyx library can only handle jpg.
+            jpg_bytes = convert_to_jpeg_inline(png_bytes)
+            file_name = os.path.join( target_folder, sanitize_for_path(document_name) + ".jpg")
+            with open(file_name, "bw") as f:
+                f.write(jpg_bytes)
+        else:
+            raise Exception(f"img tag not found")
+    except BaseException as be : 
+        be.add_note(f"when reading document data from {abs_url}")
+        raise be
+
+
 
 def recurse_aip(url : str, target_folder: str):
     try:
@@ -124,27 +147,7 @@ def recurse_aip(url : str, target_folder: str):
         # are there any documents in the current folder? -> download and store them
         documents = get_decode_aip_document_items(soup)
         for document_name, document_rel_url in documents:
-            print(f"{' ' * indent_count}<DOC>{document_name}")
-            abs_url = urllib.parse.urljoin(url, document_rel_url)
-            try:
-                response = requests.get(abs_url, allow_redirects=True, headers=user_agent_header)
-
-                # extract the image into the target folder, converted to jpeg.
-                # it is in an <img> tag, base64 encoded. 
-                document_soup = BeautifulSoup(response.text, 'html.parser')
-                img_tag = document_soup.find('img', class_ = 'pageImage', id = 'imgAIP')
-                if img_tag :
-                    png_bytes = get_bytes_from_aip_img(img_tag)
-                    # convert to jpg, as pyx library can only handle jpg.
-                    jpg_bytes = convert_to_jpeg_inline(png_bytes)
-                    file_name = os.path.join( target_folder, sanitize_for_path(document_name) + ".jpg")
-                    with open(file_name, "bw") as f:
-                        f.write(jpg_bytes)
-                else:
-                    raise Exception(f"img tag not found")
-            except BaseException as be : 
-                be.add_note(f"when reading document data from {abs_url}")
-                raise be
+            download_document_item(url, target_folder, document_name, document_rel_url)
         # build pdf from image files in folder.
         assemble_aip_images_to_pdf(target_folder)
 
@@ -159,6 +162,7 @@ def recurse_aip(url : str, target_folder: str):
     except BaseException as be:
         be.add_note(f"when processing {url}")
         raise be
+
 
 
 if __name__ == '__main__':
