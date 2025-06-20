@@ -112,22 +112,36 @@ def assemble_aip_images_to_pdf(image_folder : str):
 
 
 def download_document_item(url, target_folder, document_name, document_rel_url):
-    print(f"{' ' * indent_count}<DOC>{document_name}")
     abs_url = urllib.parse.urljoin(url, document_rel_url)
+    file_name = os.path.join( target_folder, sanitize_for_path(document_name) + ".jpg")
+    # the 'marker' file shall contain the relative url. 
+    # This should change when the document is changed, so download can be skipped for unchanged items 
+    marker_file_name = os.path.join( target_folder, sanitize_for_path(document_name) + ".marker")
+    # check marker file: 
+    if os.path.exists(marker_file_name) : 
+        with open(marker_file_name, "r") as f : 
+            prev_rurl = f.read().strip()
+        if prev_rurl == document_rel_url:
+            print(f"{' ' * indent_count}<DOC>{document_name} unchanged, skip")
+            return
+    print(f"{' ' * indent_count}<DOC>{document_name} is changed, download")
+
     try:
         response = requests.get(abs_url, allow_redirects=True, headers=user_agent_header)
 
-                # extract the image into the target folder, converted to jpeg.
-                # it is in an <img> tag, base64 encoded. 
+        # extract the image into the target folder, converted to jpeg.
+        # it is in an <img> tag, base64 encoded. 
         document_soup = BeautifulSoup(response.text, 'html.parser')
         img_tag = document_soup.find('img', class_ = 'pageImage', id = 'imgAIP')
         if img_tag :
             png_bytes = get_bytes_from_aip_img(img_tag)
-                    # convert to jpg, as pyx library can only handle jpg.
+            # convert to jpg, as pyx library can only handle jpg.
             jpg_bytes = convert_to_jpeg_inline(png_bytes)
-            file_name = os.path.join( target_folder, sanitize_for_path(document_name) + ".jpg")
             with open(file_name, "bw") as f:
                 f.write(jpg_bytes)
+            # write document_rel_url into marker file.
+            with open(marker_file_name, "w") as f:
+                f.write(document_rel_url)
         else:
             raise Exception(f"img tag not found")
     except BaseException as be : 
@@ -142,7 +156,7 @@ def recurse_aip(url : str, target_folder: str):
         url, soup = get_soup_resolve_redirects(url)
         indent_count += 1
 
-        os.makedirs(target_folder, exist_ok=False)
+        os.makedirs(target_folder, exist_ok=True)
 
         # are there any documents in the current folder? -> download and store them
         documents = get_decode_aip_document_items(soup)
@@ -171,9 +185,9 @@ if __name__ == '__main__':
 
     # use another entry point for testing: 
     #aip_root = 'https://aip.dfs.de/BasicVFR/pages/C00064.html'
-    #aip_root ='https://aip.dfs.de/BasicVFR/pages/C0005E.html'
+    aip_root ='https://aip.dfs.de/BasicVFR/pages/C0005E.html'
 
     # root of the "AD" section.
-    aip_root =  'https://aip.dfs.de/BasicVFR/pages/C0004A.html'
+    #aip_root =  'https://aip.dfs.de/BasicVFR/pages/C0004A.html'
 
     recurse_aip(aip_root, "./downloads/aip_1")
