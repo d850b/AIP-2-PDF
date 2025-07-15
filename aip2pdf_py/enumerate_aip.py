@@ -185,9 +185,9 @@ if __name__ == '__main__':
 
     # use another entry point for testing: 
     #aip_root = 'https://aip.dfs.de/BasicVFR/pages/C00064.html'
-    aip_root ='https://aip.dfs.de/BasicVFR/pages/C0005E.html'
+    #aip_root ='https://aip.dfs.de/BasicVFR/pages/C0005E.html'
 
     # root of the "AD" section.
-    #aip_root =  'https://aip.dfs.de/BasicVFR/pages/C0004A.html'
+    aip_root =  'https://aip.dfs.de/BasicVFR/pages/C0004A.html'
 
-    recurse_aip(aip_root, "./downloads/aip_1")
+    recurse_aip(aip_root, "./downloads/aip_tracking")
