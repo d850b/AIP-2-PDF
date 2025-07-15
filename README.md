@@ -69,3 +69,7 @@ The redirect mechanism might be a bit unusual, it is handled be a "reload" instr
 
 This redirect is recognized and handled by the program too, so you can use
 any permalink as entry point for the scan.
+
+## PS:
+
+Newest addition, just for completeness: The Python version now tries to track changes, most of the data is only downloaded when it is new. It works by storing the download url's in '*.marker' files. AIP changes the urls when pages change, so comparing the last known and the current url can be used skip unnecessary downloads.
